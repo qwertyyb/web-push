@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0, initial-scale=1.0, user-scalable=no,viewport-fit=cover">
+  <title>Web Push</title>
+</head>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont,'Segoe UI','Roboto', 'Droid Sans','Helvetica Neue', 'Helvetica', 'Arial', sans-serif
+  }
+  .row-item {
+    display: flex;
+    margin-bottom: 16px;
+  }
+  .row-item .row-label {
+    width: 100px;
+    flex-shrink: 0;
+    font-weight: bold;
+  }
+  .row-item .row-content {
+    width: 0;
+    flex: 1;
+  }
+  #info {
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .subscribe button {
+    padding: 10px;
+    margin-right: 16px;
+  }
+
+  .notification-item {
+    display: flex;
+    margin-bottom: 16px;
+  }
+  .notification-item .notification-image {
+    width: 50px;
+    height: 50px;
+    margin-right: 6px;
+    border-radius: 4px;
+  }
+  .notification-item .notification-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex: 1;
+    width: 0;
+  }
+  .notification-item .notification-actions {
+    margin-left: auto;
+  }
+  .notification-item button {
+    border: none;
+    outline: none;
+    background: #ddd;
+    border-radius: 4px;
+    font-size: 11px;
+    height: 16px;
+    line-height: 16px;
+  }
+  .notification-info-top {
+    display: flex;
+    justify-content: space-between;
+  }
+  .notification-info .notification-title {
+    flex: 1;
+    width: 0;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    font-size: 14px;
+  }
+  .notification-item .notification-created-at {
+    font-size: 10px;
+    color: #666;
+  }
+  .notification-item.template {
+    display: none;
+  }
+</style>
+<body>
+  <div id="app">
+    <div class="subscribe">
+      <div class="row-item">
+        <div class="row-label">订阅状态: </div>
+        <div class="row-content" id="status"></div>
+      </div>
+      <div class="row-item">
+        <button id="subscribe-btn">订阅</button>
+        <button id="unsubscribe-btn">取消订阅</button>
+        <button id="copy-subscription">复制订阅信息</button>
+      </div>
+    </div>
+
+    <div class="notification-list">
+      <div class="notification-item template">
+        <img src="https://via.placeholder.com/50x50" alt="" class="notification-image">
+        <div class="notification-info">
+          <div class="notification-info-top">
+            <div class="notification-title">Title</div>
+            <div class="notification-created-at">2023/3/14 12:00:45</div>
+          </div>
+          <div class="notification-actions">
+            <button class="notification-action">复制</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    const urlBase64ToUint8Array = base64String => {
+      var padding = '='.repeat((4 - base64String.length % 4) % 4);
+      var base64 = (base64String + padding)
+          .replace(/\-/g, '+')
+          .replace(/_/g, '/');
+      var rawData = window.atob(base64);
+      var outputArray = new Uint8Array(rawData.length);
+      for (var i = 0, max = rawData.length; i < max; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+      }
+      return outputArray;
+    }
+
+    
+    const getSubscription = () => {
+      return navigator.serviceWorker.getRegistration()
+        .then(swReg => {
+          if (!swReg) return null
+          return swReg.pushManager.getSubscription()
+        })
+    }
+
+    const subscribe = async () => {
+      const subscriptionUser = (swRegistration) => {
+        const applicationServerPublicKey = "BO3inYd3TF5Qlr02j6rhHtptINst7tzC81ikY1sK95SkiW-9Gy4SPHnDkFg1iKwS06sam5mOFFq0hDcgAiVw9xA";
+        const applicationServerKey = urlBase64ToUint8Array(applicationServerPublicKey);
+        return swRegistration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: applicationServerKey
+        })
+      }
+
+      return navigator.serviceWorker.register('./sw.js')
+        .then(() => navigator.serviceWorker.ready)
+        .then(subscriptionUser)
+        .then(subscription => {
+          refreshUI()
+          navigator.clipboard.writeText(JSON.stringify(subscribe, null, 2))
+          return subscription
+        })
+    }
+
+    const unsubscribe = async () => {
+      return getSubscription().then(subscription => subscription.unsubscribe()).then(refreshUI)
+    }
+
+    const copySubscription = async () => {
+      return navigator.clipboard.writeText(JSON.stringify(await getSubscription(), null, 2))
+    }
+
+    const createSWChannel = () => {
+      const callback = {}
+
+      const channel = new BroadcastChannel('sw-message')
+      channel.addEventListener('message', event => {
+        const { type, payload } = event.data;
+        if (type === 'callback' && payload.name && payload.key) {
+          callback[payload.key]?.(payload.result)
+          callback[payload.key] = null
+        }
+      })
+      return {
+        invoke(name, ...args) {
+          const key = Math.random()
+          channel.postMessage({ type: 'invoke', key, payload: { name, args } })
+          return new Promise((resolve, reject) => {
+            setTimeout(() => {
+              reject(new Error('timeout'))
+              callback[key] = null
+            }, 3)
+            callback[key] = resolve 
+          })
+        }
+      }
+    }
+
+    const refreshUI = async () => {
+      const subscription = await getSubscription()
+      if (subscription) {
+        document.querySelector('#status').textContent = '已订阅'
+        document.querySelector('#subscribe-btn').style.display = 'none'
+        document.querySelector('#unsubscribe-btn').style.display = 'block'
+        document.querySelector('#copy-subscription').style.display = 'block'
+      } else {
+        document.querySelector('#status').textContent = '未订阅'
+        document.querySelector('#subscribe-btn').style.display = 'block'
+        document.querySelector('#unsubscribe-btn').style.display = 'none'
+        document.querySelector('#copy-subscription').style.display = 'none'
+      }
+    }
+
+    const bindEvents = () => {
+      document.querySelector('#subscribe-btn').addEventListener('click', () => subscribe())
+      document.querySelector('#unsubscribe-btn').addEventListener('click', () => unsubscribe())
+      document.querySelector('#copy-subscription').addEventListener('click', async () => {
+        await copySubscription()
+        alert('已复制')
+      })
+    }
+    
+    refreshUI()
+    bindEvents()
+
+    setTimeout(async () => {
+      const channel = createSWChannel()
+      const results = await channel.invoke('getHistory', { page: 1, size: 50 })
+      const list = results.map(item => {
+        const d = new Date(item.createdAt)
+        return {
+          ...item,
+          createdAt: d.toLocaleString()
+        }
+      })
+      list.forEach(item => {
+        const template = document.querySelector('.notification-item.template').cloneNode(true)
+        template.querySelector('.notification-title').textContent = item.title
+        template.querySelector('.notification-created-at').textContent = item.createdAt
+        item.image && (template.querySelector('.notification-image').setAttribute('src', item.image))
+        template.classList.remove('template')
+        document.querySelector('.notification-list').appendChild(template)
+      })
+    }, 3000)
+  </script>
+</body>
+</html>
