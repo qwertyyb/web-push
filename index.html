@@ -37,8 +37,8 @@
     margin-bottom: 16px;
   }
   .notification-item .notification-image {
-    width: 50px;
-    height: 50px;
+    width: 80px;
+    height: 80px;
     margin-right: 6px;
     border-radius: 4px;
   }
@@ -57,9 +57,9 @@
     outline: none;
     background: #ddd;
     border-radius: 4px;
-    font-size: 11px;
-    height: 16px;
-    line-height: 16px;
+    font-size: 12px;
+    padding: 4px 16px;
+    margin-left: 16px;
   }
   .notification-info-top {
     display: flex;
@@ -71,7 +71,11 @@
     white-space: nowrap;
     text-overflow: ellipsis;
     overflow: hidden;
-    font-size: 14px;
+    font-size: 16px;
+    font-weight: bold;
+  }
+  .notification-item .notification-body {
+    font-size: 16px;
   }
   .notification-item .notification-created-at {
     font-size: 10px;
@@ -95,23 +99,29 @@
       </div>
     </div>
 
-    <div class="notification-list">
-      <div class="notification-item template">
-        <img src="https://via.placeholder.com/50x50" alt="" class="notification-image">
-        <div class="notification-info">
-          <div class="notification-info-top">
-            <div class="notification-title">Title</div>
-            <div class="notification-created-at">2023/3/14 12:00:45</div>
-          </div>
-          <div class="notification-actions">
-            <button class="notification-action">复制</button>
-          </div>
+
+    <div class="notification-item template">
+      <img src="https://via.placeholder.com/50x50" alt="" class="notification-image">
+      <div class="notification-info">
+        <div class="notification-info-top">
+          <div class="notification-title">Title</div>
+          <div class="notification-created-at">2023/3/14 12:00:45</div>
+        </div>
+        <div class="notification-body">Body</div>
+        <div class="notification-actions">
+          <button class="notification-action">复制</button>
         </div>
       </div>
+    </div>
+    <div class="notification-list">
     </div>
   </div>
   
   <script>
+    const state = {
+      list: []
+    }
+
     const urlBase64ToUint8Array = base64String => {
       var padding = '='.repeat((4 - base64String.length % 4) % 4);
       var base64 = (base64String + padding)
@@ -136,7 +146,7 @@
 
     const subscribe = async () => {
       const subscriptionUser = (swRegistration) => {
-        const applicationServerPublicKey = "BO3inYd3TF5Qlr02j6rhHtptINst7tzC81ikY1sK95SkiW-9Gy4SPHnDkFg1iKwS06sam5mOFFq0hDcgAiVw9xA";
+        const applicationServerPublicKey = "BBaQuJBSl1ImfSnxy5XujDhJzio3rVXAwwZHsAH9ZvJi8NNsehLifAbdzasRpbyP635md8akkidIxCu7UkBx3Mo";
         const applicationServerKey = urlBase64ToUint8Array(applicationServerPublicKey);
         return swRegistration.pushManager.subscribe({
             userVisibleOnly: true,
@@ -181,7 +191,7 @@
             setTimeout(() => {
               reject(new Error('timeout'))
               callback[key] = null
-            }, 3)
+            }, 3000)
             callback[key] = resolve 
           })
         }
@@ -189,6 +199,7 @@
     }
 
     const refreshUI = async () => {
+      refreshList()
       const subscription = await getSubscription()
       if (subscription) {
         document.querySelector('#status').textContent = '已订阅'
@@ -203,6 +214,15 @@
       }
     }
 
+    const Action = {
+      openUrl(url) {
+        window.open(url)
+      },
+      copy(text) {
+        navigator.clipboard.writeText(text)
+      }
+    }
+
     const bindEvents = () => {
       document.querySelector('#subscribe-btn').addEventListener('click', () => subscribe())
       document.querySelector('#unsubscribe-btn').addEventListener('click', () => unsubscribe())
@@ -210,13 +230,43 @@
         await copySubscription()
         alert('已复制')
       })
+      document.addEventListener('visibilitychange', function () {
+        // 用户打开或回到页面
+        if (document.visibilityState === 'visible') {
+          refreshUI()
+        }
+      });
+      document.querySelector('.notification-list').addEventListener('click', e => {
+        // if (!e.target.classList.contains('notification-item')) return;
+        const index = +e.composedPath().find(d => d.classList?.contains('notification-item')).dataset.index
+        const info = state.list[index]
+        let action = info.notification_config.actions[0]
+        if (e.target.classList.contains('notification-action')) {
+          action = info.notification_config.actions?.find(item => item.action === e.target.dataset.action)
+        }
+        if (!action) return;
+        if (action.action === 'openUrl') {
+          Action.openUrl(...action.args)
+        } else if (action.action === 'copy') {
+          Action.copy(...action.args)
+        }
+      })
     }
-    
-    refreshUI()
-    bindEvents()
 
-    setTimeout(async () => {
+    const refreshList = async () => {
       const channel = createSWChannel()
+      const createActions = (actions, template) => {
+        const fragment = document.createDocumentFragment()
+        actions.forEach((item) => {
+          const action = template.querySelector('.notification-action').cloneNode(true)
+          action.setAttribute('data-action', item.action)
+          action.textContent = item.title
+          fragment.appendChild(action)
+        })
+        template.querySelector('.notification-action').remove()
+        template.querySelector('.notification-actions').appendChild(fragment)
+        return fragment
+      }
       const results = await channel.invoke('getHistory', { page: 1, size: 50 })
       const list = results.map(item => {
         const d = new Date(item.createdAt)
@@ -225,15 +275,28 @@
           createdAt: d.toLocaleString()
         }
       })
-      list.forEach(item => {
+      state.list = list
+
+      const fragment = document.createDocumentFragment()
+      list.forEach((item, index) => {
+        const { createdAt, notification_config: n } = item
+        const { title, body, image, actions } = n
         const template = document.querySelector('.notification-item.template').cloneNode(true)
-        template.querySelector('.notification-title').textContent = item.title
-        template.querySelector('.notification-created-at').textContent = item.createdAt
-        item.image && (template.querySelector('.notification-image').setAttribute('src', item.image))
+        template.querySelector('.notification-title').textContent = title
+        template.querySelector('.notification-body').textContent = body
+        template.querySelector('.notification-created-at').textContent = createdAt
+        image && (template.querySelector('.notification-image').setAttribute('src', image))
+        createActions(actions || [], template)
         template.classList.remove('template')
-        document.querySelector('.notification-list').appendChild(template)
+        template.dataset.index = index
+        fragment.appendChild(template)
       })
-    }, 3000)
+      document.querySelector('.notification-list').innerHTML = ''
+      document.querySelector('.notification-list').appendChild(fragment)
+    }
+    
+    refreshUI()
+    bindEvents()
   </script>
 </body>
 </html>

@@ -72,14 +72,19 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener('push', e => {
     const json = e.data.json()
+    console.log(json)
+    const { notification_config: n } = json
 
-    const notification = self.registration.showNotification(json.title, {
-      actions: [
+    const notification = self.registration.showNotification(n.title, {
+      actions: [ // safari not support
         {
           action: '复制',
           title: '复制'
         }
-      ]
+      ],
+      badge: '', // safari not support
+      data: undefined, // safari not support
+      ...n
     })
     e.waitUntil(Promise.all([notification, store.add({ ...json, createdAt: Date.now() })]))
 })
