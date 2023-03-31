@@ -127,7 +127,8 @@
   
   <script>
     const state = {
-      list: []
+      list: [],
+      subscription: ''
     }
 
     const urlBase64ToUint8Array = base64String => {
@@ -176,10 +177,6 @@
       return getSubscription().then(subscription => subscription.unsubscribe()).then(refreshUI)
     }
 
-    const copySubscription = async () => {
-      return navigator.clipboard.writeText(JSON.stringify(await getSubscription(), null, 2))
-    }
-
     const createSWChannel = () => {
       const callback = {}
 
@@ -209,6 +206,7 @@
     const refreshUI = async () => {
       refreshList()
       const subscription = await getSubscription()
+      state.subscription = subscription || ''
       if (subscription) {
         document.querySelector('#status').textContent = '已订阅'
         document.querySelector('#subscribe-btn').style.display = 'none'
@@ -226,18 +224,19 @@
       openUrl(url) {
         window.open(url)
       },
-      async copy(text) {
+      copy(text) {
         navigator.clipboard.writeText(text)
-        navigator.clipboard.writeText(JSON.stringify(await getSubscription(), null, 2))
       }
     }
 
     const bindEvents = () => {
       document.querySelector('#subscribe-btn').addEventListener('click', () => subscribe())
       document.querySelector('#unsubscribe-btn').addEventListener('click', () => unsubscribe())
-      document.querySelector('#copy-subscription').addEventListener('click', async () => {
-        await copySubscription()
-        alert('已复制')
+      document.querySelector('#copy-subscription').addEventListener('click', () => {
+        navigator.clipboard.writeText(JSON.stringify(state.subscription, null, 2))
+          .then(() => {
+            alert('已复制')
+          })
       })
       document.addEventListener('visibilitychange', function () {
         // 用户打开或回到页面
