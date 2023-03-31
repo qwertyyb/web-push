@@ -1,0 +1,29 @@
+{
+  "short_name": "Web Push",
+  "name": "Web Push",
+  "icons": [
+    {
+      "src": "./icon-vector.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512"
+    },
+    {
+      "src": "./icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "./icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "id": "/web-push/index.html?source=pwa",
+  "start_url": "/web-push/index.html?source=pwa",
+  "background_color": "#3367D6",
+  "display": "standalone",
+  "scope": "/web-push/",
+  "theme_color": "#3367D6",
+  "shortcuts": [],
+  "description": "Show Notification By Using Web Push"
+}
