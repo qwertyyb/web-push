@@ -1,0 +1,23 @@
+{
+  "name": "web-push",
+  "version": "1.0.0",
+  "description": "",
+  "main": "sw.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qwertyyb/web-push.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/qwertyyb/web-push/issues"
+  },
+  "homepage": "https://github.com/qwertyyb/web-push#readme",
+  "dependencies": {
+    "web-push": "^3.5.0"
+  }
+}
